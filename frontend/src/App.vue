@@ -50,8 +50,10 @@
             <option value="all">全部语系</option>
             <option v-for="f in LANGUAGE_FAMILIES" :key="f.id" :value="f.id">{{ f.name }}</option>
           </select>
+          <button class="bg-slate-900 border border-slate-600 rounded px-3 text-sm text-slate-300 hover:border-cyan-500" @click="onClearQuery">清除</button>
+          <button class="bg-slate-900 border border-slate-600 rounded px-3 text-sm text-slate-300 hover:border-cyan-500 disabled:opacity-40 disabled:hover:border-slate-600" :disabled="!store.hasLastQuery" @click="onRestoreQuery">恢复上次查询</button>
         </div>
-        <div class="overflow-x-auto max-h-64 overflow-y-auto">
+        <div ref="tableWrapRef" class="overflow-x-auto max-h-64 overflow-y-auto">
           <table class="w-full text-xs">
             <thead class="sticky top-0 bg-slate-700">
               <tr>
@@ -66,6 +68,9 @@
               </tr>
             </thead>
             <tbody>
+              <tr v-if="store.filteredCognates.length === 0">
+                <td colspan="8" class="px-2 py-6 text-center text-slate-500">无匹配的同源词，请调整检索条件</td>
+              </tr>
               <tr v-for="cs in store.filteredCognates" :key="cs.root" class="border-t border-slate-700 hover:bg-slate-700">
                 <td class="px-2 py-1.5 font-mono text-slate-200 font-bold">{{ cs.root }}</td>
                 <td class="px-2 py-1.5 text-slate-400">{{ cs.meaning }}</td>
@@ -85,13 +90,27 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, nextTick, onMounted } from 'vue'
 import * as d3 from 'd3'
 import { useEtymologyStore, LANGUAGE_FAMILIES } from './store/etymology'
 
 const store = useEtymologyStore()
 const svgRef = ref<SVGSVGElement | null>(null)
+const tableWrapRef = ref<HTMLElement | null>(null)
 const COLORS: Record<string, string> = { ie: '#3b82f6', st: '#22c55e', aa: '#f59e0b', ural: '#8b5cf6' }
+
+// 滚动定位与条件清除/恢复走同一条流程：清除时记住位置，恢复时回到原位置
+let savedScrollTop = 0
+
+function onClearQuery() {
+  savedScrollTop = tableWrapRef.value?.scrollTop ?? 0
+  store.clearQuery()
+}
+
+function onRestoreQuery() {
+  store.restoreQuery()
+  nextTick(() => { if (tableWrapRef.value) tableWrapRef.value.scrollTop = savedScrollTop })
+}
 
 function drawGraph() {
   if (!svgRef.value) return
